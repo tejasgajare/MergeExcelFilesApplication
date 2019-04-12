@@ -2,8 +2,11 @@ import window
 import tkinter as tk
 
 # TODO: Restructure Geometry
+# RUN: pyinstaller --onefile --windowed --icon=icons/merge.ico --name="MergeExcel" main.py
 
 root = tk.Tk()  # Main window
+root.wm_iconbitmap('icons/merge.ico')
+root.title("Merge Files")
 my_gui = window.MainWindow(root)
 my_gui.pack(side="top", fill="both", expand=True)
 

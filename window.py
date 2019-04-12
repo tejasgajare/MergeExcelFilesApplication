@@ -5,7 +5,6 @@ import utils
 class MainWindow(Frame):
     def __init__(self, master):
         Frame.__init__(self, master)
-        self.master.title("Merge Files")
 
         self.information_frame = InformationFrame(self)
         self.information_frame.grid(row=0, column=0, padx=(10, 10), pady=(10, 10))
