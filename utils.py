@@ -1,113 +1,87 @@
-import xlrd
-import xlwt
 from tkinter import filedialog
-
-new_book = xlwt.Workbook()
-new_sheet = new_book.add_sheet("Sheet 1")
-selected_files = list()
-selected_files_set = set()
+import pandas as pd
+import numpy as np
 
 
-def write_column_to_sheet(values, column_idx):
-    # This function writes a single column to new file
-    global new_sheet
-    for i in range(len(values)):
-        new_sheet.row(i + 1).write(column_idx, values[i])
+class Merger:
+    def __init__(self):
+        self.measurer = np.vectorize(len)
+        self.selected_files = list()
+        self.selected_files_set = set()
+        self.data = None
+        self.writer = None
 
+    @staticmethod
+    def combine_data(paths, include_params=False):
+        if not include_params:
+            data_dict = {}
+            for idx, path in enumerate(paths):
+                temp_df = pd.read_excel(path)
+                index = temp_df.columns.values[0]
+                columns = temp_df.columns.values
+                data_dict['WALK_' + str(idx + 1)] = pd.DataFrame(columns=columns, data=temp_df).set_index(index)
 
-def write_coloured_row(sheet, idx, value, total_columns):
-    # This functions writes a colored row over the newly appended data
-    # to help differentiate the data visually.
-    if idx % 2 == 0:
-        style = xlwt.Style.easyxf('pattern: pattern solid, fore_colour rose;'
-                                  'font: colour black, bold True;')
-
-    else:
-        style = xlwt.Style.easyxf('pattern: pattern solid, fore_colour sky_blue;'
-                                  'font: colour black, bold True;')
-
-    col = idx * total_columns
-    # HARD-CODED #######
-    row = 0
-    for i in range(total_columns):
-        if i == total_columns // 2:
-            sheet.write(row, col + i, value, style)
+            return pd.concat(data_dict, axis=1)
         else:
-            sheet.write(row, col + i, '', style)
+            data_frames = []
+            for path in paths:
+                temp_df = pd.read_excel(path)
+                data_frames.append(temp_df)
+            return pd.concat(data_frames, axis=1)
 
+    def write_to_file(self, path, final_dataframe, formatting=False):
+        writer = pd.ExcelWriter(path, engine='xlsxwriter')
+        final_dataframe.to_excel(writer, sheet_name='Sheet1')
 
-def append_data_into_file(old_sheet, append_from_column_idx):
-    # This Functions iterates over columns of new file
-    for col in range(old_sheet.ncols):
-        column_values = old_sheet.col_values(col)
-        write_column_to_sheet(column_values, append_from_column_idx)
-        append_from_column_idx += 1
+        if formatting:
+            worksheet = writer.sheets['Sheet1']
+            max_lengths = [self.measurer(final_dataframe.index.values.astype(str)).max(axis=0)]
+            max_lengths.extend(self.measurer(final_dataframe.values.astype(str)).max(axis=0))
+            for idx, column_len in enumerate(max_lengths):
+                worksheet.set_column(idx, idx, column_len + 2)
 
+        return writer
 
-def merge_selected_files():
-    global new_book
-    global new_sheet
+    def merge_selected_files(self, include_params):
+        print(f"include_params: {include_params}")
+        self.data = self.combine_data(self.selected_files, include_params)
 
-    new_book = xlwt.Workbook()
-    new_sheet = new_book.add_sheet("Sheet 1")
+    def file_dialog_select_files(self, listbox):
+        selected = filedialog.askopenfilenames(
+            initialdir='/',
+            initialfile='',
+            filetypes=[("Excel", "*.xlsx"), ("Excel", "*.xls")]
+        )
+        print(f"Selected Files : {selected}")
+        for file in selected:
+            if file in self.selected_files_set:
+                continue
+            else:
+                self.selected_files.append(file)
+                self.selected_files_set.add(file)
+                name = f"{len(self.selected_files)} | {file.split('/')[-1]}"
+                listbox.insert("end", name)
 
-    append_from_column_idx = 0
-    for idx, PATH in enumerate(selected_files):
-        old_book = xlrd.open_workbook(PATH)
-        old_sheet = old_book.sheet_by_index(0)
-        value = "WALK " + str(idx + 1)
+        return len(self.selected_files)
 
-        write_coloured_row(new_sheet, idx, value, old_sheet.ncols)
-        append_data_into_file(old_sheet, append_from_column_idx)
-        append_from_column_idx += old_sheet.ncols
+    @staticmethod
+    def file_dialog_save_file():
+        rep = filedialog.asksaveasfilename(
+            confirmoverwrite=True,
+            defaultextension=".xlsx",
+            initialdir='/',
+            initialfile='merged.xlsx',
+            filetypes=[("Excel", "*.xlsx"), ("Excel", "*.xls")]
+        )
+        return rep
 
+    def clear_all(self, listbox):
+        self.selected_files.clear()
+        self.selected_files_set.clear()
+        listbox.delete(0, 'end')
 
-# Action Frame
-def sort_listbox(listbox):
-    listbox.delete(0, 'end')
-    selected_files.sort()
-    print(selected_files)
-    for idx, file in enumerate(selected_files):
-        name = f"{idx + 1} | {file.split('/')[-1]}"
-        listbox.insert("end", name)
-
-
-def file_dialog_select_files(listbox):
-    selected = filedialog.askopenfilenames(
-        initialdir='/',
-        initialfile='',
-        filetypes=[("Excel", "*.xlsx"), ("Excel", "*.xls")]
-    )
-    print(selected_files)
-    for file in selected:
-        if file in selected_files_set:
-            continue
-        else:
-            selected_files.append(file)
-            selected_files_set.add(file)
-            name = f"{len(selected_files)} | {file.split('/')[-1]}"
-            listbox.insert("end", name)
-
-    return len(selected_files)
-
-
-def file_dialog_save_file():
-    rep = filedialog.asksaveasfilename(
-        confirmoverwrite=True,
-        defaultextension=".xls",
-        initialdir='/',
-        initialfile='merged.xls',
-        filetypes=[("Excel", "*.x lsx"), ("Excel", "*.xls")]
-    )
-    return rep
-
-
-def clear_all(listbox):
-    selected_files.clear()
-    selected_files_set.clear()
-    listbox.delete(0, 'end')
-
-
-def save_merged_files(path):
-    new_book.save(path)
-    print(f"file saved at location {path}")
+    def save_merged_files(self, path, formatting):
+        print(f"formatting: {formatting}")
+        self.writer = self.write_to_file(path, self.data, formatting)
+        self.writer.save()
+        print(f"file saved at location {path}")
